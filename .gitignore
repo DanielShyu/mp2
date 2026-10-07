@@ -1,0 +1,11 @@
+# C++ executables
+client
+server
+*.out
+*.exe
+
+# Python
+*.py
+#json
+*.json
+*.txt
