@@ -21,8 +21,7 @@
 #define TYPE_CLIENT_COUNT 3 //client count attribute type
 
 struct __attribute__((__packed__)) sbcp_header {
-    unsigned int vrsn : 9; // 9 bits for version
-    unsigned int type : 7; // 7 bits for type
+    uint16_t vrsn_type; // 16 bits for version and type (9 bits for version, 7 bits for type)
     uint16_t length;    // 16 bits for length
 };
 
@@ -192,7 +191,12 @@ int main(int argc, char **argv){
                 else
                 {
                     struct sbcp_header *header = (struct sbcp_header *)buffer; //put the buffer as an SBSP header
-                    int sbcpheader_type = header->type; //get the SBSP message type
+                    int sbcpheader_vrsn_type = header->vrsn_type; //get the SBSP message type
+                    
+                    //convert the vrsn_type from network byte order to host byte order
+                    int sbcpheader_vrsn = (sbcpheader_vrsn_type >> 7) & 0x1FF;
+                    int sbcpheader_type = sbcpheader_vrsn_type & 0x7F;
+
                     int sbcpheader_length = ntohs(header->length); //get the length of the message from the header
 
                     //check the type of the SBSP message and handle accordingly
@@ -260,9 +264,9 @@ int main(int argc, char **argv){
                         int fwd_totallength = attr_usernamelength + attr_messagelength+sizeof(struct sbcp_header);
 
                         struct sbcp_header *fwd_hdr = (struct sbcp_header *)fwd_buffer;
-                        fwd_hdr->type = TYPE_FWD;
+                        uint16_t raw_vrsn_type = (SBCP_vrsn << 7) | TYPE_FWD;
+                        fwd_hdr->vrsn_type = htons(raw_vrsn_type);
                         fwd_hdr->length = htons(fwd_totallength);
-
                         struct sbcp_attribute *fwd_attr_username = (struct sbcp_attribute *)(fwd_buffer + sizeof(struct sbcp_header));
                         fwd_attr_username->type = htons(TYPE_USERNAME);
                         fwd_attr_username->length = htons(attr_usernamelength);
