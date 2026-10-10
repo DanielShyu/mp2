@@ -191,7 +191,7 @@ int main(int argc, char **argv){
                 else
                 {
                     struct sbcp_header *header = (struct sbcp_header *)buffer; //put the buffer as an SBSP header
-                    int sbcpheader_vrsn_type = header->vrsn_type; //get the SBSP message type
+                    int sbcpheader_vrsn_type = ntohs(header->vrsn_type); //get the SBSP message type
                     
                     //convert the vrsn_type from network byte order to host byte order
                     int sbcpheader_vrsn = (sbcpheader_vrsn_type >> 7) & 0x1FF;
