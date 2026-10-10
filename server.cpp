@@ -42,22 +42,11 @@ const int MAXLEN = 1024;
 char buffer[MAXLEN];
 
 int main(int argc, char **argv){
-    int listenfd, connfd;
+    int listenfd;
     int addrlen , new_socket , client_socket[30] , max_clients = 30 , activity, i , valread , sd;
 	int max_sd;
     struct sockaddr_in address;
     fd_set readfds;// Set of socket descriptors
-
-    //initialise client_username array
-    for (int i = 0; i < 30; i++) {
-        client_username[i].sd = 0;
-        client_username[i].username = "";
-    }
-    //initialise all client_socket[] to 0 so not checked
-    for (i = 0; i < max_clients; i++) 
-    {
-        client_socket[i] = 0;
-    }
 
     // The server is started with the command line: ./server <server_ip> <server_port> <max_clients>
     if (argc != 4) {
@@ -72,6 +61,13 @@ int main(int argc, char **argv){
     if (port <= 0 || max_clients <= 0) {
         fprintf(stderr, "Error: Invalid port or max_clients value.\n");
         return 1;
+    }
+
+    //initialise client_username array and client_socket array
+    for (int i = 0; i < max_clients; i++) {
+        client_username[i].sd = 0;
+        client_username[i].username = "";
+        client_socket[i] = 0;
     }
     
     //create socket
@@ -149,21 +145,37 @@ int main(int argc, char **argv){
                 perror("accept");
                 exit(EXIT_FAILURE);
             }
-         
-            //inform user of socket number - used in send and receive commands
-            printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-             
-            //add new socket to array of sockets
-            for (i = 0; i < max_clients; i++) 
-            {
-                //if position is empty
-				if( client_socket[i] == 0 )
-                {
-                    client_socket[i] = new_socket;
-                    printf("Adding to list of sockets as %d\n" , i);
-					break;
+            //check if the number of clients has reached the maximum limit
+            bool max_clients_reached = true;
+            for(int i=0; i<max_clients; i++){
+                if(client_socket[i]==0){
+                    max_clients_reached = false;
+                    break;
                 }
             }
+            if(max_clients_reached){
+                printf("Maximum number of clients reached. Connection rejected.\n");
+                close(new_socket);
+                continue;
+            }
+            else{
+                //inform user of socket number - used in send and receive commands
+                printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+                
+                //add new socket to array of sockets
+                for (i = 0; i < max_clients; i++) 
+                {
+                    //if position is empty
+                    if( client_socket[i] == 0 )
+                    {
+                        client_socket[i] = new_socket;
+                        printf("Adding to list of sockets as %d\n" , i);
+                        break;
+                    }
+                }
+            }
+
+            
         }
          
         //else its some IO operation on some other socket
@@ -194,16 +206,16 @@ int main(int argc, char **argv){
                     int sbcpheader_vrsn_type = ntohs(header->vrsn_type); //get the SBSP message type
                     
                     //convert the vrsn_type from network byte order to host byte order
-                    int sbcpheader_vrsn = (sbcpheader_vrsn_type >> 7) & 0x1FF;
+                    //int sbcpheader_vrsn = (sbcpheader_vrsn_type >> 7) & 0x1FF;
                     int sbcpheader_type = sbcpheader_vrsn_type & 0x7F;
 
-                    int sbcpheader_length = ntohs(header->length); //get the length of the message from the header
+                    //int sbcpheader_length = ntohs(header->length); //get the length of the message from the header
 
                     //check the type of the SBSP message and handle accordingly
                     if(sbcpheader_type == TYPE_JOIN)
                     {
                         struct sbcp_attribute *attr = (struct sbcp_attribute *)(buffer + sizeof(struct sbcp_header)); //point to the attribute section of the message
-                        int attr_type = ntohs(attr->type); //get the type of the attribute
+                        //int attr_type = ntohs(attr->type); //get the type of the attribute
                         int attr_length = ntohs(attr->length); //get the length of the attribute
 
                         //get the length of the user name
@@ -212,7 +224,7 @@ int main(int argc, char **argv){
                         
                         //Check if the username is already in use
                         bool is_duplicate = false;
-                        for (int i = 0; i < 30; i++) {
+                        for (int i = 0; i < max_clients; i++) {
                             if (client_username[i].sd != 0 && client_username[i].username == client_name) {
                                 is_duplicate = true;
                                 break;
@@ -221,11 +233,14 @@ int main(int argc, char **argv){
                         if (is_duplicate) {
                             printf("Duplicate username detected: %s\n", client_name.c_str());
                             close(sd); //close the socket to decline the join request
-                            
+                            client_socket[i] = 0;
+                            client_username[i].sd = 0;
+                            client_username[i].username = "";
+
                             //To do(bonus) return nak
                         } else {
                             //store the username information in the client_username array
-                            for (int i = 0; i < 30; i++) {
+                            for (int i = 0; i < max_clients; i++) {
                                 if (client_username[i].sd == 0) {
                                     client_username[i].sd = sd;
                                     client_username[i].username = client_name;
@@ -239,7 +254,7 @@ int main(int argc, char **argv){
                     else if(sbcpheader_type == TYPE_SEND)
                     {
                         struct sbcp_attribute *attr = (struct sbcp_attribute *)(buffer + sizeof(struct sbcp_header)); //point to the attribute section of the message
-                        int attr_type = ntohs(attr->type); //get the type of the attribute
+                        //int attr_type = ntohs(attr->type); //get the type of the attribute
                         int attr_length = ntohs(attr->length); //get the length of the attribute
 
                         //get the length of the message
@@ -247,7 +262,7 @@ int main(int argc, char **argv){
                         std::string send_message(attr->payload, message_length);
                         //get the sender's name from the client_username
                         std::string sender_name = "";
-                        for (int i = 0; i < 30; i++) {
+                        for (int i = 0; i < max_clients; i++) {
                             if (client_username[i].sd == sd) {
                                 sender_name = client_username[i].username;
                                 break;
@@ -277,7 +292,7 @@ int main(int argc, char **argv){
                         fwd_attr_message->length = htons(attr_messagelength);
                         memcpy(fwd_attr_message->payload, send_message.c_str(), message_length);
 
-                        for (int i = 0; i < 30; i++) {
+                        for (int i = 0; i < max_clients; i++) {
                             if (client_username[i].sd == sd) {
                                 continue; // skip the sender
                             }
