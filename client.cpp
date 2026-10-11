@@ -169,6 +169,8 @@ void handle_server_message(const char *buf, int n) {
     int pos = SBCP_HDR_LEN;
     char username[MAX_USERNAME_LEN + 1] = "";
     char message[MAX_MESSAGE_LEN + 1]   = "";
+    char reason[MAX_REASON_LEN + 1]     = "";   // NAK 
+    int  client_count = -1;                    
     while (pos<length) {
         // trivial length check
         if (length-pos<ATTR_HDR_LEN) {
@@ -201,6 +203,26 @@ void handle_server_message(const char *buf, int n) {
             memcpy(message, payload, payload_len);         
             message[payload_len] = '\0';     
         }
+        //bnous, NAK
+        else if (attr_type == ATTR_REASON) {
+            if (payload_len > MAX_REASON_LEN) {
+                fprintf(stderr, "reason too long, discarded\n");
+                return;
+            }
+            memcpy(reason,payload,payload_len);
+            reason[payload_len]= '\0' ; 
+        }
+        else if (attr_type == ATTR_CLIENT_COUNT) {
+            // client count 是 2 bytes 的數字，不是字串
+            if (payload_len!=2) {
+                fprintf(stderr, "invalid client count length, discarded\n");
+                return;
+            }
+            uint16_t raw;
+            memcpy(&raw,payload,2);
+            client_count = ntohs(raw);
+        }
+        //bonus nak
         pos += attr_len;
     }
 
