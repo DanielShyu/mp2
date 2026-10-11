@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <signal.h>
-
+#include <time.h>
 #define SBCP_VERSION        3
 // Message types
 #define SBCP_MSG_JOIN            2
@@ -300,14 +300,30 @@ int main(int argc, char **argv) {
         close(sockfd);
         return 1 ; 
     }
+    //bonus: time out 
+    time_t last_active = time(NULL);   // JOIN 完成的時間，當作第一次活動
+    bool idle_sent = false;  
     //select between listen and send
     while (1) {
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);   
         FD_SET(sockfd, &readfds);
+        //bonus: timeout
+        struct timeval tv;
+        struct timeval *tvp = NULL;        
+        if (!idle_sent) {
+            int remaining = IDLE_TIMEOUT_SEC-(time(NULL)-last_active);
+            if (remaining < 0) {
+                remaining = 0;             
+            }
+            tv.tv_sec  = remaining;
+            tv.tv_usec = 0;
+            tvp = &tv;               
+        }
+        //bonus: timeout end        
         int maxfd = sockfd;               
-        int ready = select(maxfd + 1, &readfds, NULL, NULL, NULL);
+        int ready = select(maxfd + 1, &readfds, NULL, NULL, tvp);
         if(ready==-1){
             if(errno==EINTR){
                 continue;
@@ -316,6 +332,22 @@ int main(int argc, char **argv) {
             close(sockfd);
             return 1; 
         }
+        //bonus timeout
+        //send idle
+        if (ready == 0) {
+            int idle_len = build_idle(buf,sizeof(buf));
+            if (idle_len < 0) {
+                close(sockfd);
+                return 1;
+            }
+            if (send_all(sockfd,buf,idle_len) < 0) {
+                close(sockfd);
+                return 1;
+            }
+            idle_sent = true; 
+            continue;   // 沒有 fd 就緒，直接進入下一輪
+        }
+        //bonus timeout end
         // message ready to send
         if (FD_ISSET(STDIN_FILENO, &readfds)) {
             char line[MAX_MESSAGE_LEN + 2] ; 
@@ -342,6 +374,8 @@ int main(int argc, char **argv) {
                 close(sockfd);//message send fail, disconnect.
                 return 1; 
             }
+            last_active = time(NULL);
+            idle_sent   = false;
         }
         // message arrive
         if (FD_ISSET(sockfd, &readfds)) {
