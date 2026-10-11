@@ -40,6 +40,7 @@
 #define ATTR_HDR_LEN        4
 #define MAX_BUF             1024
 #define IDLE_TIMEOUT_SEC    10   // Bonus Feature 2
+#define MAX_USER_COUNT 40
 using namespace std;
 struct __attribute__((__packed__)) sbcp_header {
     uint16_t vrsn_type;   // Version(9b) | Type(7b)
@@ -170,7 +171,9 @@ void handle_server_message(const char *buf, int n) {
     char username[MAX_USERNAME_LEN + 1] = "";
     char message[MAX_MESSAGE_LEN + 1]   = "";
     char reason[MAX_REASON_LEN + 1]     = "";   // NAK 
-    int  client_count = -1;                    
+    int  client_count = -1;     
+    char user_list[MAX_USER_COUNT][MAX_USERNAME_LEN + 1];   // ACK list
+    int  user_count = 0;   // counter for user_list             
     while (pos<length) {
         // trivial length check
         if (length-pos<ATTR_HDR_LEN) {
@@ -193,7 +196,12 @@ void handle_server_message(const char *buf, int n) {
                 return;
             }
             memcpy(username, payload, payload_len);         
-            username[payload_len] = '\0';                   
+            username[payload_len] = '\0'; 
+            // bonus: user name
+            if (user_count<MAX_USER_COUNT) {
+                strcpy(user_list[user_count], username);
+                user_count+=1 ;                   
+            }
         }
         else if (attr_type == ATTR_MESSAGE) {
             if (payload_len > MAX_MESSAGE_LEN) {          
@@ -260,6 +268,7 @@ void handle_server_message(const char *buf, int n) {
             break;
     }
 }
+
 //bonus ipv6
 int connect_to_server_ipv6(const char *host, const char *port) {
     struct addrinfo hints;
