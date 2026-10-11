@@ -14,6 +14,8 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <time.h>
+#include <netdb.h>
+
 #define SBCP_VERSION        3
 // Message types
 #define SBCP_MSG_JOIN            2
@@ -236,6 +238,40 @@ void handle_server_message(const char *buf, int n) {
             break;
     }
 }
+//bonus ipv6
+int connect_to_server_ipv6(const char *host, const char *port) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints)); 
+    hints.ai_family   = AF_UNSPEC;    //support both ipv4 and ipv6
+    hints.ai_socktype = SOCK_STREAM;  //tcp
+    struct addrinfo *res;
+    int err = getaddrinfo(host,port,&hints,&res);
+    if (err != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+        return -1;
+    }
+    int sockfd = -1;
+    struct addrinfo *p;
+    for (p = res; p != NULL; p = p->ai_next) {
+        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (sockfd < 0) {
+            continue;                
+        }
+        if (connect(sockfd,p->ai_addr,p->ai_addrlen) == 0) {
+            break;                   
+        }
+        close(sockfd);                
+        sockfd = -1;
+    }
+    freeaddrinfo(res);
+
+    if (sockfd < 0) {
+        fprintf(stderr, "could not connect to %s:%s\n", host, port);
+        return -1;
+    }
+    return sockfd;
+}
+//bonus ipv6
 int connect_to_server(const char *ip, int port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd==-1){
@@ -283,7 +319,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Invalid port number\n");
         return 1; 
     }
-    int sockfd = connect_to_server(server_ip,portNumber); 
+    //int sockfd = connect_to_server(server_ip,portNumber); 
+    int sockfd = connect_to_server_ipv6(server_ip,server_port);
     if(sockfd<0){
         fprintf(stderr, "Connection Fail\n");
         return 1 ; 
