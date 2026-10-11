@@ -40,7 +40,7 @@
 #define ATTR_HDR_LEN        4
 #define MAX_BUF             1024
 #define IDLE_TIMEOUT_SEC    10   // Bonus Feature 2
-#define MAX_USER_COUNT 40
+#define MAX_USER_COUNT 256
 using namespace std;
 struct __attribute__((__packed__)) sbcp_header {
     uint16_t vrsn_type;   // Version(9b) | Type(7b)
@@ -262,6 +262,23 @@ void handle_server_message(const char *buf, int n) {
                 break;
             }
             printf("%s is idle\n", username);
+            break;
+        case SBCP_MSG_ACK:
+            if (message[0]!='\0') {
+                printf("%s\n", message);
+                break;
+            }
+            printf("Joined! %d client(s) online: \n", client_count);
+            for(int i=0; i < user_count ; i++){
+                printf("user %d: %s\n",i+1,user_list[i]) ; 
+            }
+            break;
+        case SBCP_MSG_NAK: 
+            if (reason[0]=='\0') {
+                printf("Join rejected by server\n");
+            } else {
+                printf("Join rejected: %s\n", reason);
+            }
             break;
         default:
             fprintf(stderr, "unknown message type %d, ignored\n", type);
