@@ -479,7 +479,7 @@ int main(int argc, char **argv)
                         bool ack_valid = true;
                         for (int j = 0; j < max_clients; j++)
                         {
-                            if (client_username[j].sd == 0)
+                            if (client_username[j].sd == 0||client_username[j].sd == sd)
                             {
                                 continue;
                             }
