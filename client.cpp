@@ -35,7 +35,7 @@
 // Max allowed 
 #define MAX_USERNAME_LEN    16
 #define MAX_MESSAGE_LEN     512
-#define MAX_REASON_LEN      32
+#define MAX_REASON_LEN      128
 #define SBCP_HDR_LEN        4
 #define ATTR_HDR_LEN        4
 #define MAX_BUF             1024
