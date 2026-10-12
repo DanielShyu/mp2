@@ -271,6 +271,10 @@ int handle_server_message(const char *buf, int n) {
                 break;
             }
             printf("Joined! %d client(s) online: \n", client_count);
+            if(client_count==1){
+                printf("You are the only user.\n");
+                break;
+            }
             printf("===========Server users list===========\n");
             for(int i=0; i < user_count ; i++){
                 printf("user %d: %s\n",i+1,user_list[i]) ; 
