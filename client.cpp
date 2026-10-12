@@ -148,23 +148,25 @@ int send_all(int sockfd, const char *buf, int len) {
 }
 
 // Receive message from server
-void handle_server_message(const char *buf, int n) {
+// return 0: handle successfully
+// return -1: disconnect
+int handle_server_message(const char *buf, int n) {
     // check length(screen for short message)
     if (n<SBCP_HDR_LEN) {
         fprintf(stderr, "message too short, discarded\n");
-        return;
+        return 0;
     }
     int version, type, length;
     decode_header((const sbcp_header*)buf, &version, &type, &length);
     // version confirm
     if (version!=SBCP_VERSION) {
         fprintf(stderr, "unknown version %d, discarded\n", version);
-        return;
+        return 0;
     }
     // length confirm
     if (length!=n) {
         fprintf(stderr, "length mismatch (header %d, read %d), discarded\n", length, n);
-        return;
+        return 0;
     }
     // attribute check
     int pos = SBCP_HDR_LEN;
@@ -178,7 +180,7 @@ void handle_server_message(const char *buf, int n) {
         // trivial length check
         if (length-pos<ATTR_HDR_LEN) {
             fprintf(stderr, "truncated attribute, discarded\n");
-            return;
+            return 0 ;
         }
         const struct sbcp_attr_header *ah = (const struct sbcp_attr_header *)(buf + pos);
         int attr_type = ntohs(ah->type);
@@ -186,14 +188,14 @@ void handle_server_message(const char *buf, int n) {
         // check for valid attribute len, avoid infinite loop
         if (attr_len<ATTR_HDR_LEN||pos+attr_len>n) {
             fprintf(stderr, "invalid attribute length, discarded\n");
-            return;
+            return 0 ;
         }
         const char *payload = buf+pos+ATTR_HDR_LEN;
         int payload_len     = attr_len-ATTR_HDR_LEN;
         if (attr_type == ATTR_USERNAME) {
             if (payload_len > MAX_USERNAME_LEN) {          
                 fprintf(stderr, "username too long, discarded\n");
-                return;
+                return 0 ;
             }
             memcpy(username, payload, payload_len);         
             username[payload_len] = '\0'; 
@@ -206,7 +208,7 @@ void handle_server_message(const char *buf, int n) {
         else if (attr_type == ATTR_MESSAGE) {
             if (payload_len > MAX_MESSAGE_LEN) {          
                 fprintf(stderr, "Message too long, discarded\n");
-                return;
+                return 0 ;
             }
             memcpy(message, payload, payload_len);         
             message[payload_len] = '\0';     
@@ -215,7 +217,7 @@ void handle_server_message(const char *buf, int n) {
         else if (attr_type == ATTR_REASON) {
             if (payload_len > MAX_REASON_LEN) {
                 fprintf(stderr, "reason too long, discarded\n");
-                return;
+                return 0 ;
             }
             memcpy(reason,payload,payload_len);
             reason[payload_len]= '\0' ; 
@@ -224,7 +226,7 @@ void handle_server_message(const char *buf, int n) {
             // client count 是 2 bytes 的數字，不是字串
             if (payload_len!=2) {
                 fprintf(stderr, "invalid client count length, discarded\n");
-                return;
+                return 0 ;
             }
             uint16_t raw;
             memcpy(&raw,payload,2);
@@ -279,11 +281,13 @@ void handle_server_message(const char *buf, int n) {
             } else {
                 printf("Join rejected: %s\n", reason);
             }
+            return -1;
             break;
         default:
             fprintf(stderr, "unknown message type %d, ignored\n", type);
             break;
     }
+    return 0;
 }
 
 //bonus ipv6
@@ -479,7 +483,10 @@ int main(int argc, char **argv) {
                 close(sockfd);
                 return 1 ; 
             }
-            handle_server_message(rbuf,r);
+            if(handle_server_message(rbuf,r)<0){
+                close(sockfd);
+                return 1 ; 
+            }
         }
     }
     
