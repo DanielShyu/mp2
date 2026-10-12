@@ -7,7 +7,7 @@ A chat server and client implementing the Simple Broadcast Chat Protocol (SBCP).
 | Member | Role |
 |---|---|
 | `chiahsiang shyu` | Client implementation, client test cases |
-| `leeann chu` | Server implementation, server test cases |
+| `lian chu` | Server implementation, server test cases |
 
 ## Build
 
@@ -56,23 +56,20 @@ Type a line and press Enter to send a message. Press `Ctrl+D` to leave the chat.
 
 ## Architecture
 
-**Message format.** Every SBCP message is a 4-byte header (`Version:9 | Type:7 | Length:16`) followed by zero or more TLV attributes (`Type:16 | Length:16 | Payload`). All multi-byte fields are sent in network byte order. Version and Type are packed into one `uint16_t`.
+**Message format.** Every SBCP message is a 4-byte header (`Version:9 | Type:7 | Length:16`) followed by zero or more TLV attributes (`Type:16 | Length:16 | Payload`). All multi-byte fields are sent in network byte order. Version and Type are packed into one `uint16_t` (Version(9b) | Type(7b)).
 
 **Server.** Uses `getaddrinfo(NULL, port)` with `AI_PASSIVE` to create two listening sockets, one IPv4 and one IPv6, both on the given port. It watches both listening sockets and every connected client socket with `select()`. New connections are accepted; `JOIN` registers a username (duplicates are rejected); `SEND` is converted to `FWD` and broadcast to all other clients; a `read()` returning 0 means the client left, and its resources and username are released.
 
-**Client.** Watches `stdin` and the server socket with `select()`.
+**Client.** Watches `stdin` and the server socket with `select()`. Send stdin as a message to the server; decode message sent by server and display through `stdout`.
 
-| Function | Purpose |
-|---|---|
-| `encode_header` / `decode_header` | Pack/unpack the SBCP header |
-| `append_attr` | Append one TLV attribute with bounds checking |
-| `build_join` / `build_send` / `build_idle` | Build outgoing messages |
-| `send_all` | Loop until the whole message is sent |
-| `handle_server_message` | Validate header (version, length), walk all attributes with length checks, and display the message |
-| `connect_to_server` | Resolve the address with `getaddrinfo` (IPv4/IPv6) and connect |
 
-All received lengths are validated against the bytes actually read before any copy, to prevent buffer over-reads/overruns.
-
+## Bonus Functions
+### Bonus 
+- OFFLINE/ONLINE: whenever user join/disconnect, the server also send an `JOIN`/`OFFLINE` message to all the users 
+- ACK: when an user joins, the server will send an `ACK` message telling current server user count(including the new user), as well as a list of id of all online user(excluding the new user).
+- NAK: When a request for join is declined by the server, the server send an `NAK` message to the declined user, including the reason why the user is declined.
+- IDLE: A user is consider active for both joining and sending a message. If the last active time of an user exceeds 10 sec, an `IDLE` message would be send from the idle user to the server, and the server would then forward this information to all the other users(idle or not) in server
+- IPV6/IPV4: As mentioned before, this work support both ipv6 and ipv4.
 ## Errata 
 
 - **One message per `read()`.** If the header Length does not match the number of bytes read, the message is discarded (as required by the spec). If TCP delivers two server messages in a single read, both are discarded.
