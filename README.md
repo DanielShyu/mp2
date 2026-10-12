@@ -6,8 +6,8 @@ A chat server and client implementing the Simple Broadcast Chat Protocol (SBCP).
 
 | Member | Role |
 |---|---|
-| `chiahsiang shyu` | Client implementation, client test cases |
-| `lian chu` | Server implementation, server test cases |
+| Chiahsiang Shyu | Client implementation, client test cases |
+| Lian Chu | Server implementation, server test cases |
 
 ## Build
 
@@ -30,7 +30,7 @@ Requires `g++` on a standard Linux system.
 |---|---|
 | `server_ip` | Kept for the required command-line format; the server listens on **all** local IPv4 and IPv6 addresses regardless of this value |
 | `server_port` | Port to listen on (1024–65535 recommended) |
-| `max_clients` | Maximum number of clients in the chat room |
+| `max_clients` | Maximum number of clients in the chat room, should be an integer between 1-30|
 
 ### Client
 
@@ -60,16 +60,15 @@ Type a line and press Enter to send a message. Press `Ctrl+D` to leave the chat.
 
 **Server.** Uses `getaddrinfo(NULL, port)` with `AI_PASSIVE` to create two listening sockets, one IPv4 and one IPv6, both on the given port. It watches both listening sockets and every connected client socket with `select()`. New connections are accepted; `JOIN` registers a username (duplicates are rejected); `SEND` is converted to `FWD` and broadcast to all other clients; a `read()` returning 0 means the client left, and its resources and username are released.
 
-**Client.** Watches `stdin` and the server socket with `select()`. Send stdin as a message to the server; decode message sent by server and display through `stdout`.
+**Client.** Watches `stdin` and the server socket with `select()`. Sends each line from stdin to the server, and decodes and displays messages from the server. 
 
 
 ## Bonus Functions
-### Bonus 
-- OFFLINE/ONLINE: whenever user join/disconnect, the server also send an `JOIN`/`OFFLINE` message to all the users 
-- ACK: when an user joins, the server will send an `ACK` message telling current server user count(including the new user), as well as a list of id of all online user(excluding the new user).
-- NAK: When a request for join is declined by the server, the server send an `NAK` message to the declined user, including the reason why the user is declined.
-- IDLE: A user is consider active for both joining and sending a message. If the last active time of an user exceeds 10 sec, an `IDLE` message would be send from the idle user to the server, and the server would then forward this information to all the other users(idle or not) in server
-- IPV6/IPV4: As mentioned before, this work support both ipv6 and ipv4.
+- OFFLINE/ONLINE: Whenever a user joins or disconnects, the server also send an `ONLINE`/`OFFLINE` message to all the users 
+- ACK: When a user joins, the server sends an `ACK` message telling current server user count(including the new user), as well as a list of id of all online user(excluding the new user).
+- NAK: When a request for join is declined by the server, the server sends a `NAK` message to the declined user, including the reason why the user is declined.
+- IDLE: A user is considered active for both joining and sending a message. If the last active time of an user exceeds 10 sec, an `IDLE` message is sent from the idle user to the server, and the server would then forward this information to all the other users (idle or not) in server
+- IPV6/IPV4: As mentioned before, this work supports both ipv6 and ipv4.
 ## Errata 
 
 - **One message per `read()`.** If the header Length does not match the number of bytes read, the message is discarded (as required by the spec). If TCP delivers two server messages in a single read, both are discarded.
