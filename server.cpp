@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     char *server_ip = argv[1];
     int port = atoi(argv[2]);
     max_clients = atoi(argv[3]);
-    if (port <= 0 || max_clients <= 0)
+    if (port <= 0 || max_clients <= 0 ||max_clients > 30)
     {
         fprintf(stderr, "Error: Invalid port or max_clients value.\n");
         return 1;
