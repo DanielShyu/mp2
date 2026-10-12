@@ -1,0 +1,82 @@
+# ECEN 602 MP2 — TCP Simple Broadcast Chat (SBCP)
+
+A chat server and client implementing the Simple Broadcast Chat Protocol (SBCP).
+
+## Team Roles
+
+| Member | Role |
+|---|---|
+| `chiahsiang shyu` | Client implementation, client test cases |
+| `leeann chu` | Server implementation, server test cases |
+
+## Build
+
+```bash
+make          # builds ./server and ./client
+make clean    # removes binaries and object files
+```
+
+Requires `g++` on a standard Linux system.
+
+## Usage
+
+### Server
+
+```bash
+./server <server_ip> <server_port> <max_clients>
+```
+
+| Argument | Description |
+|---|---|
+| `server_ip` | Kept for the required command-line format; the server listens on **all** local IPv4 and IPv6 addresses regardless of this value |
+| `server_port` | Port to listen on (1024–65535 recommended) |
+| `max_clients` | Maximum number of clients in the chat room |
+
+### Client
+
+```bash
+./client <username> <server_ip> <server_port>
+```
+
+| Argument | Description |
+|---|---|
+| `username` | Chat name, 1–16 characters, must be unique in the room, case sensitive |
+| `server_ip` | Server address: IPv4, IPv6, or hostname (e.g. `127.0.0.1`, `::1`, `localhost`) |
+| `server_port` | Server port |
+
+Type a line and press Enter to send a message. Press `Ctrl+D` to leave the chat.
+
+### Example
+
+```bash
+./server 127.0.0.1 9000 3
+./client alice 127.0.0.1 9000
+./client bob   127.0.0.1 9000
+```
+
+## Architecture
+
+**Message format.** Every SBCP message is a 4-byte header (`Version:9 | Type:7 | Length:16`) followed by zero or more TLV attributes (`Type:16 | Length:16 | Payload`). All multi-byte fields are sent in network byte order. Version and Type are packed into one `uint16_t`.
+
+**Server.** Uses `getaddrinfo(NULL, port)` with `AI_PASSIVE` to create two listening sockets, one IPv4 and one IPv6, both on the given port. It watches both listening sockets and every connected client socket with `select()`. New connections are accepted; `JOIN` registers a username (duplicates are rejected); `SEND` is converted to `FWD` and broadcast to all other clients; a `read()` returning 0 means the client left, and its resources and username are released.
+
+**Client.** Watches `stdin` and the server socket with `select()`.
+
+| Function | Purpose |
+|---|---|
+| `encode_header` / `decode_header` | Pack/unpack the SBCP header |
+| `append_attr` | Append one TLV attribute with bounds checking |
+| `build_join` / `build_send` / `build_idle` | Build outgoing messages |
+| `send_all` | Loop until the whole message is sent |
+| `handle_server_message` | Validate header (version, length), walk all attributes with length checks, and display the message |
+| `connect_to_server` | Resolve the address with `getaddrinfo` (IPv4/IPv6) and connect |
+
+All received lengths are validated against the bytes actually read before any copy, to prevent buffer over-reads/overruns.
+
+## Errata 
+
+- **One message per `read()`.** If the header Length does not match the number of bytes read, the message is discarded (as required by the spec). If TCP delivers two server messages in a single read, both are discarded.
+- **Long input.** Input longer than 512 characters is split by `fgets()`; the remainder is treated as a separate message.
+- **Pasting multiple lines.** Because `fgets()` buffers `stdin`, pasting several lines at once may delay the later lines until the next keypress. Normal typing is not affected.
+- **IDLE timing.** The idle timer has 1-second resolution, so IDLE is sent 9–10 seconds after the last message. IDLE is sent once per idle period, and is only reset by sending a chat message (receiving messages does not reset it).
+- **IDLE is not replayed.** A client that joins after another client became idle will not be told about it.
